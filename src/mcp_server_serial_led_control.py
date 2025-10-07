@@ -42,13 +42,13 @@ async def control_led(action: str) -> str:
 
     Args:
         action: A string indicating the action to perform.
-                Valid actions are "on", "off", "toggle", and "blink".
+                Valid actions are "on", "off", and "status".
 
     Returns:
         A string indicating the result of the action.
     """
-    if action not in [CMD_LED_ON, CMD_LED_OFF]:
-        return f"Invalid action: {action}. Valid actions are 'on', 'off'."
+    if action not in [CMD_LED_ON, CMD_LED_OFF, CMD_LED_STATUS]:
+        return f"Invalid action: {action}. Valid actions are 'on', 'off', and 'status'."
 
     # send command to the serial device
     result = await send_serial_command(action)
@@ -58,11 +58,7 @@ async def control_led(action: str) -> str:
 def debug_manual_input():
     # debug by user input
     while True:
-        cmd = (
-            input("Enter command (on, off, toggle, blink, status, exit): ")
-            .strip()
-            .lower()
-        )
+        cmd = input("Enter command (on, off, status, exit): ").strip().lower()
         if cmd == "exit":
             print("Exiting...")
             break

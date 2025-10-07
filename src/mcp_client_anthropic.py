@@ -1,4 +1,5 @@
 import asyncio
+
 from typing import Optional
 from contextlib import AsyncExitStack
 import os
@@ -7,6 +8,16 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from anthropic import Anthropic
+
+SYSTEM_PROMPT = """
+    You are an AI assistant that help users based on the provided tools.
+    You can call tools as needed to fulfill user requests.
+    Carefully consider the available tools, their actions, and possible consequences of each action.
+    You may call tools multiple times to complete the user's request.
+    When you've fully completed the task or answering user queries, you must include '[TASK_COMPLETE]' at the end of your response.
+    """
+MAX_HISTORY_LENGTH = 50  # Limit message history to prevent token overflow
+MAX_ITERATION = 10  # Limit max API calls per query
 
 
 class MCPClientAnthropic:
@@ -19,6 +30,11 @@ class MCPClientAnthropic:
         if not api_key:
             raise ValueError("ANTHROPIC_API_KEY environment variable is required")
         self.anthropic = Anthropic(api_key=api_key)
+
+        # system prompt to guide Claude's behavior
+        self.system_prompt = SYSTEM_PROMPT
+        self.conversation_history = []
+        self.max_history_length = MAX_HISTORY_LENGTH
 
     async def connect_to_server(self, server_script_path: str):
         """Connect to an MCP server
@@ -47,74 +63,106 @@ class MCPClientAnthropic:
         await self.session.initialize()
 
         # List available tools
-        response = await self.session.list_tools()
-        tools = response.tools
+        tools_list = await self.session.list_tools()
+        tools = tools_list.tools
         print("\nConnected to server with tools:", [tool.name for tool in tools])
 
     async def process_query(self, query: str) -> str:
         """Process a query using Claude and available tools"""
-        messages = [{"role": "user", "content": query}]
+        message = {"role": "user", "content": query}
 
-        response = await self.session.list_tools()
+        self.conversation_history.append(message)
+
+        tools_list = await self.session.list_tools()
         available_tools = [
             {
                 "name": tool.name,
                 "description": tool.description,
                 "input_schema": tool.inputSchema,
             }
-            for tool in response.tools
+            for tool in tools_list.tools
         ]
+
+        api_call_count = 0
 
         # Initial Claude API call
         response = self.anthropic.messages.create(
             model="claude-opus-4-1-20250805",
             max_tokens=1000,
-            messages=messages,
+            # need to send full history for context since message API is stateless
+            messages=self.conversation_history,
+            system=self.system_prompt,
             tools=available_tools,
         )
+        api_call_count += 1
 
         # Process response and handle tool calls
         final_text = []
 
-        assistant_message_content = []
-        for content in response.content:
-            if content.type == "text":
-                final_text.append(content.text)
-                assistant_message_content.append(content)
-            elif content.type == "tool_use":
-                tool_name = content.name
-                tool_args = content.input
+        while api_call_count < MAX_ITERATION:
+            for content in response.content:
+                if content.type == "text":
+                    final_text.append(content.text)
+                    # self.conversation_history.append(
+                    #     {"role": "assistant", "content": content}
+                    # )
 
-                # Execute tool call
-                result = await self.session.call_tool(tool_name, tool_args)
-                final_text.append(f"[Calling tool {tool_name} with args {tool_args}]")
+                    if "[TASK_COMPLETE]" in content.text:
+                        return "\n".join(final_text)  # Exit if task is complete
 
-                assistant_message_content.append(content)
-                messages.append(
-                    {"role": "assistant", "content": assistant_message_content}
-                )
-                messages.append(
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "tool_result",
-                                "tool_use_id": content.id,
-                                "content": result.content,
-                            }
-                        ],  # type: ignore
-                    }
-                )
+                elif content.type == "tool_use":
+                    tool_name = content.name
+                    tool_args = content.input
 
-                # Get next response from Claude
-                response = self.anthropic.messages.create(
-                    model="claude-opus-4-1-20250805",
-                    max_tokens=1000,
-                    messages=messages,
-                    tools=available_tools,
-                )
+                    # Execute tool call
+                    result = await self.session.call_tool(tool_name, tool_args)
 
-                final_text.append(response.content[0].text)
+                    final_text.append(
+                        f"[Calling tool {tool_name} with args {tool_args}]"
+                    )
+
+                    # self.conversation_history.append(
+                    #     {"role": "assistant", "content": content}
+                    # )
+                    self.conversation_history.append(
+                        {
+                            "role": "assistant",
+                            "content": [
+                                {
+                                    "type": "tool_use",
+                                    "id": content.id,
+                                    "name": tool_name,
+                                    "input": tool_args,
+                                }
+                            ],
+                        }
+                    )
+                    self.conversation_history.append(
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "tool_result",
+                                    "tool_use_id": content.id,
+                                    "content": result.content,
+                                }
+                            ],
+                        }
+                    )
+
+            # Get next response from Claude
+            response = self.anthropic.messages.create(
+                model="claude-opus-4-1-20250805",
+                max_tokens=1000,
+                messages=self.conversation_history,
+                system=self.system_prompt,
+                tools=available_tools,
+            )
+            api_call_count += 1
+
+        final_text.append(
+            f"[Max iterations reached ({MAX_ITERATION}). Ending response.]"
+        )
 
         return "\n".join(final_text)
 
@@ -132,6 +180,10 @@ class MCPClientAnthropic:
 
                 response = await self.process_query(query)
                 print("\n" + response)
+
+                # trim conversation history if too long
+                if len(self.conversation_history) > self.max_history_length:
+                    self.conversation_history.pop(0)
 
             except Exception as e:
                 print(f"\nError: {str(e)}")
