@@ -9,12 +9,14 @@ from mcp.client.stdio import stdio_client
 
 from anthropic import Anthropic
 
+# "claude-3-5-haiku-20241022"
+# "claude-opus-4-1-20250805"
+MODEL = "claude-3-5-haiku-20241022"
 SYSTEM_PROMPT = """
     You are an AI assistant that help users based on the provided tools.
     You can call tools as needed to fulfill user requests.
     Carefully consider the available tools, their actions, and possible consequences of each action.
     You may call tools multiple times to complete the user's request.
-    When you've fully completed the task or answering user queries, you must include '[TASK_COMPLETE]' at the end of your response.
     """
 MAX_HISTORY_LENGTH = 50  # Limit message history to prevent token overflow
 MAX_ITERATION = 10  # Limit max API calls per query
@@ -103,12 +105,9 @@ class MCPClientAnthropic:
             for content in response.content:
                 if content.type == "text":
                     final_text.append(content.text)
-                    # self.conversation_history.append(
-                    #     {"role": "assistant", "content": content}
-                    # )
-
-                    if "[TASK_COMPLETE]" in content.text:
-                        return "\n".join(final_text)  # Exit if task is complete
+                    self.conversation_history.append(
+                        {"role": "assistant", "content": [content]}
+                    )
 
                 elif content.type == "tool_use":
                     tool_name = content.name
@@ -122,7 +121,7 @@ class MCPClientAnthropic:
                     )
 
                     # self.conversation_history.append(
-                    #     {"role": "assistant", "content": content}
+                    #     {"role": "assistant", "content": [content]}
                     # )
                     self.conversation_history.append(
                         {
@@ -159,6 +158,10 @@ class MCPClientAnthropic:
                 tools=available_tools,
             )
             api_call_count += 1
+
+            # Check for end of response
+            if response.stop_reason == "end_turn":
+                return "\n".join(final_text)
 
         final_text.append(
             f"[Max iterations reached ({MAX_ITERATION}). Ending response.]"
