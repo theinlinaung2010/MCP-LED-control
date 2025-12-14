@@ -8,7 +8,7 @@ SYSTEM_PROMPT = """
     You can call tools as needed to fulfill user requests.
     Carefully consider the available tools, their actions, and possible consequences of each action.
     You may call tools multiple times to complete the user's request.
-    """
+"""
 MAX_HISTORY_LENGTH = 50  # Limit message history to prevent token overflow
 MAX_ITERATION = 10  # Limit max API calls per query
 
@@ -32,6 +32,7 @@ class AnthropicAgent:
         final_text = []
 
         for iteration in range(MAX_ITERATION):
+            # send current conversation to LLM
             response = self.anthropic.messages.create(
                 model=self.model,
                 max_tokens=1000,
@@ -40,13 +41,16 @@ class AnthropicAgent:
                 tools=tools,
             )
 
+            # process response contents
             for content in response.content:
+                # handle text response
                 if content.type == "text":
                     final_text.append(content.text)
                     self.conversation_history.append(
                         {"role": "assistant", "content": [content]}
                     )
 
+                # handle tool calls
                 elif content.type == "tool_use":
                     tool_name = content.name
                     tool_args = content.input
@@ -102,6 +106,7 @@ class AnthropicAgent:
 
                 response = await self.process_query(user_input)
                 print(f"Agent: {response}")
+                print()
 
             except KeyboardInterrupt:
                 print("\nExiting Agent chat loop")

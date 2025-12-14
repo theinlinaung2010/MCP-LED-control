@@ -140,6 +140,7 @@ class OpenAIAgent:
 
                 response = await self.process_query(user_input)
                 print(f"Agent: {response}")
+                print()
 
             except KeyboardInterrupt:
                 print("\nExiting Agent chat loop")
