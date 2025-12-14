@@ -40,9 +40,13 @@ async def run_openai_agent(server_script_path: str):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python client.py <path_to_server_script>")
+    if len(sys.argv) < 3:
+        print("Usage: python main.py anthropic|openai <path_to_server_script>")
         sys.exit(1)
 
-    asyncio.run(run_anthropic_agent(sys.argv[1]))
-    # asyncio.run(run_openai_agent(sys.argv[1]))
+    agent_type = sys.argv[1].lower()
+
+    if agent_type == "anthropic":
+        asyncio.run(run_anthropic_agent(sys.argv[2]))
+    elif agent_type == "openai":
+        asyncio.run(run_openai_agent(sys.argv[2]))

@@ -1,4 +1,4 @@
-# MCP OpenAI Test
+# MCP LED Control
 
 Playground repo for learning and testing MCP (Model Context Protocol) server development with both Anthropic Claude and OpenAI ChatGPT.
 
@@ -7,14 +7,14 @@ https://modelcontextprotocol.io/
 ## Features
 
 - **MCP LED control server**: MCP server for controlling an LED through Arduino compatible boards (tested on ESP6266).
-- **Anthropic Client**: MCP client using Claude
-- **OpenAI Client**: MCP client using ChatGPT
+- **Anthropic Agent**: Running MCP client using Claude
+- **OpenAI Agent**: Running MCP client using ChatGPT
 
 ## Setup
 
 1. **Install dependencies**:
 
-   ```bash
+   ```powershell
    uv sync
    ```
 
@@ -26,22 +26,22 @@ https://modelcontextprotocol.io/
    ```
 
 3. **Activate the virtual environment**:
-   ```bash
+   ```powershell
    .venv\Scripts\Activate.ps1
    ```
 
 ## Usage
 
-### Running the OpenAI MCP Client
+### Running MCP client using OpenAI
 
-```bash
-python src/mcp_client_openai.py src/mcp_server_serial_led_control.py
+```powershell
+python main.py openai src/mcp_server_serial_led_control.py
 ```
 
-### Running the Anthropic MCP Client
+### Running MCP client using Anthropic
 
-```bash
-python src/mcp_client_anthropic.py src/mcp_server_serial_led_control.py
+```powershell
+python main.py anthropic src/mcp_server_serial_led_control.py
 ```
 
 ### Example Queries

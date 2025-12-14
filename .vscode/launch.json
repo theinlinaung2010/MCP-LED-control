@@ -12,7 +12,7 @@
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "python": "${workspaceFolder}/.venv/Scripts/python.exe",
-      "args": ["src/mcp_server_serial_led_control.py"],
+      "args": ["openai", "src/mcp_server_serial_led_control.py"],
       "env": {
         "PYTHONPATH": "${workspaceFolder}"
       },
