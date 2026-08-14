@@ -55,13 +55,31 @@ async def control_led(action: str) -> str:
     return result
 
 
+@mcp.tool()
+async def toggle_led() -> str:
+    """Toggle the LED between ON and OFF.
+
+    Returns:
+        A string indicating the result of the action.
+    """
+    current_status = await send_serial_command(CMD_LED_STATUS)
+    next_action = CMD_LED_OFF if "ON" in current_status else CMD_LED_ON
+    result = await send_serial_command(next_action)
+    return result
+
+
 def debug_manual_input():
     # debug by user input
     while True:
-        cmd = input("Enter command (on, off, status, exit): ").strip().lower()
+        cmd = input("Enter command (on, off, status, toggle, exit): ").strip().lower()
         if cmd == "exit":
             print("Exiting...")
             break
+        elif cmd == "toggle":
+            import asyncio
+
+            response = asyncio.run(toggle_led())
+            print(f"Response: {response}")
         elif cmd in [
             CMD_LED_ON,
             CMD_LED_OFF,
